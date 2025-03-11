@@ -90,7 +90,57 @@
             <div class="mb-5">
                 Finally, after setting everything up and making sure that it works, it was time to fully assemble the cover that came in JustPi Kit. Stick thermal pads on the upper case, connect the little fans to GPIO pins 4 (red) and 6 (black), tight a few screws and it's done!
             </div>
-            <img class="w-100" src="images/img5.jpg" alt="">
+            <img class="w-100 mb-5" src="images/img5.jpg" alt="">
+            <h3>Securing and Monitoring the NAS</h3>
+            <div class="mb-3">
+                Since everything is up and working, we can harden our NAS a bit. Let's start by setting up the firewall. I'm going to use UFW, so first I have to install it with<br>
+                <code>$ sudo apt install ufw</code><br>
+                Then I added rules for allowing SSH traffic, but only from my local network:<br>
+                <code>$ sudo ufw allow from 192.168.0.0/16 to any port 22</code><br>
+                and allowing Samba traffic, again only from local network:<br>
+                <code>$ sudo ufw allow from 192.168.0.0/16 to any app Samba</code><br>
+            After that, just enable UFW and you are ready to go.
+            </div>
+            <div class="mb-3">
+                We got our firewall set up, so let's make some monitoring scripts. I'll make one script monitoring disk usage, and one monitoring CPU temperature.<br>
+                First script - temperature monitoring<br>
+                My simple bash script for temperature monitoring looks like that:<br>
+
+                <code>
+                    #!/bin/bash<br>
+                    <br>
+                    LOG_FILE="/var/log/cpu_temp.log"<br>
+                    MAX_TEMP=55<br>
+                    <br>
+                    TEMP=$(cat /sys/class/thermal/thermal_zone0/temp)<br>
+                    TEMP=$(($TEMP/1000))<br>
+                    <br>
+                    if [ "$TEMP" -gt "$MAX_TEMP" ]; then<br>
+                        echo "Date: $(date), temp: $TEMP" >> $LOG_FILE<br>
+                    fi<br>
+                    </code>
+                    What it does is it checks the current temperature and if it's higher than specified threshold (MAX_TEMP), it creates an entry in the log file with a current date. I've set the threshold to 55 degrees Celsius, that's because I have an efficient cooling case.
+            </div>
+            <div class="mb-3">
+                Second script - disk usage monitoring<br>
+                <code>
+                    #!/bin/bash<br>
+                    <br>
+                    LOG_FILE="/var/log/disk_usage.log"<br>
+                    MAX_USAGE_WARN=90<br>
+                    <br>
+                    USAGE=$(df -h | grep /dev/sda1 | awk '{print $5}' | tr -d %)<br>
+                    <br>
+                    if [ "$USAGE" -gt "$MAX_USAGE_WARN" ]; then<br>
+                        echo "$(date), Warning: current disk usage is $USAGE %" >> $LOG_FILE<br>
+                    fi<br>
+                </code>
+                It checks current disk usage and compares it agains specified threshold, which is set to 90%, if it's higher, than it creates an entry with a warning.<br>
+            </div>
+            <div class="mb-3">
+                Remember to grant appropriate permissions to these scripts, I gave them rwx for owner and only r for the rest. First of all, we want to be able to execute the script, second, we don't want any other user, with potentially malicious intents, to modify the script.<br>
+                Finally, I've scheduled cron jobs that run these scripts. The temperature changes are more dynamic, so I scheduled the temperature monitoring script for every 5 minutes. Disk usage won't be changing so rapidly, so it will execute every hour.
+            </div>
         </div>
     </div>
 </body>
